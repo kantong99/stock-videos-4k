@@ -1,0 +1,40 @@
+name: Render videos
+
+on:
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: 'Durasi detik (5-60)'
+        default: '20'
+      fps:
+        description: 'FPS standar (24, 25, 30, 60)'
+        default: '30'
+      preview:
+        description: 'Preview cepat 1080p (bukan untuk diunggah)'
+        type: boolean
+        default: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        scene: [silk, terrain, aurora]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: npm install
+      - run: npx playwright install --with-deps chromium
+      - run: node render.js --scene ${{ matrix.scene }} --seconds ${{ inputs.seconds }} --fps ${{ inputs.fps }} --preview ${{ inputs.preview }}
+      - run: ffprobe -hide_banner out/*.mp4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: video-${{ matrix.scene }}
+          path: out/*.mp4
+          retention-days: 7
+          compression-level: 0
