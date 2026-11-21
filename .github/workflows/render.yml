@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scene: [silk, terrain, aurora]
+        scene: [silk, terrain, aurora, hex, ridges]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,3 +38,15 @@ jobs:
           path: out/*.mp4
           retention-days: 7
           compression-level: 0
+
+  bundle:
+    needs: render
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gabungkan 5 video jadi 1 artifact (1 Zip)
+        uses: actions/upload-artifact/merge@v4
+        with:
+          name: semua-video-4k
+          pattern: video-*
+          delete-merged: true
+          retention-days: 7

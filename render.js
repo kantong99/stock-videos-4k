@@ -10,8 +10,8 @@ const args = process.argv.slice(2);
 const get = (k, d) => { const i = args.indexOf('--' + k); return i > -1 ? args[i + 1] : d; };
 
 const scene = get('scene');
-if (!['silk', 'terrain', 'aurora'].includes(scene)) {
-  console.error('Pakai: node render.js --scene silk|terrain|aurora [--seconds 20] [--fps 30] [--preview true]');
+if (!['silk', 'terrain', 'aurora', 'hex', 'ridges'].includes(scene)) {
+  console.error('Pakai: node render.js --scene silk|terrain|aurora|hex|ridges [--seconds 20] [--fps 30] [--preview true]');
   process.exit(1);
 }
 const preview = get('preview', 'false') === 'true';
@@ -26,7 +26,7 @@ const outFile = path.join(dir, 'out', `${scene}_${W}x${H}_${fps}fps${preview ? '
 const ff = spawn('ffmpeg', [
   '-y', '-f', 'image2pipe', '-framerate', String(fps), '-c:v', 'png', '-i', '-',
   '-vf', 'scale=in_range=full:out_range=tv:out_color_matrix=bt709,format=yuv420p',
-  '-c:v', 'libx264', '-preset', preview ? 'veryfast' : 'slow', '-crf', preview ? '20' : '14',
+  '-c:v', 'libx264', '-preset', preview ? 'veryfast' : 'slow', '-crf', preview ? '20' : '16',
   '-profile:v', 'high', '-g', String(fps * 2),
   '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709',
   '-movflags', '+faststart', outFile

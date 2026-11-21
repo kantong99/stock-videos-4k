@@ -8,6 +8,8 @@
     "render:silk": "node render.js --scene silk",
     "render:terrain": "node render.js --scene terrain",
     "render:aurora": "node render.js --scene aurora",
+    "render:hex": "node render.js --scene hex",
+    "render:ridges": "node render.js --scene ridges",
     "preview": "node render.js --scene silk --preview true"
   },
   "dependencies": {
