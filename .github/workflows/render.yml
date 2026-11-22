@@ -83,6 +83,12 @@ jobs:
         with:
           node-version: 20
 
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version | head -n 1
+
       - name: Install dependencies
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install; fi
@@ -90,10 +96,10 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Cek scene
+      - name: Cek scene dan ffmpeg
         run: |
+          command -v ffmpeg || { echo "ffmpeg tidak ditemukan"; exit 1; }
           test -f "scenes/${{ matrix.scene }}.js" || { echo "scenes/${{ matrix.scene }}.js tidak ada"; exit 1; }
-          ffmpeg -version | head -n 1
 
       - name: Render ${{ matrix.scene }}
         run: |
