@@ -1,6 +1,6 @@
 # Stock videos (4K, loop, orisinal)
 
-Lima video abstrak 3840x2160, 16:9, 30 fps, 20 detik, loop mulus, tanpa teks/logo:
+Enam video 3840x2160, 16:9, 30 fps, 20 detik, loop mulus, tanpa teks/logo:
 
 | Scene | Konsep |
 |---|---|
@@ -9,15 +9,18 @@ Lima video abstrak 3840x2160, 16:9, 30 fps, 20 detik, loop mulus, tanpa teks/log
 | `aurora` | Gradien cair + bokeh + grain halus |
 | `hex` | Kisi heksagon dengan gelombang cahaya |
 | `ridges` | Garis gelombang berlapis ala punggung bukit |
+| `car` | Mobil 3D hitam generik (tanpa merek), kamera sinematik belakang → samping → depan, melaju kencang lalu melambat |
 
 ## Cara render (GitHub Actions)
 1. Unggah isi folder ini ke repo GitHub (termasuk folder `.github`).
-2. Buka tab **Actions** → **Render videos** → **Run workflow**.
+2. Buka tab **Actions** → **Render videos** → **Run workflow**. Pilih `scene` (`car` atau `all`).
 3. Centang `preview` dulu untuk tes cepat (1080p, 4 detik). Hapus centang untuk render 4K penuh.
-4. Setelah semua selesai, unduh artifact **semua-video-4k** (1 Zip berisi 5 MP4, disimpan 7 hari). Jangan commit MP4 ke git.
-5. Repo privat di paket gratis punya kuota penyimpanan artifact 500 MB; lima video 4K bisa melebihinya. Pakai repo publik atau unduh lalu hapus artifact.
+4. Setelah selesai, buka **Releases** di halaman utama repo. Video MP4 ada di bagian **Assets** (batas 2 GB per file, tidak memakai kuota artifact). Jangan commit MP4 ke git.
 
-Render 4K lewat CPU lambat (kira-kira puluhan menit per video). Lima video jalan paralel.
+Render 4K lewat CPU lambat (puluhan menit per video, scene `car` paling lama). Video jalan paralel.
+
+## Scene `car`
+WebGL2 murni (tanpa library), digambar frame demi frame. Koreografi memakai waktu ternormalisasi, jadi berapa pun durasinya urutan gerak tetap utuh: kamera dari belakang ke samping lalu depan, mobil melaju kencang lalu melambat (roda, pantulan lampu, tiang, dan garis jalan ikut melambat, hidung mobil sedikit menunduk saat pengereman). Atur di `scenes/car.js`: `VMAX` (kecepatan), `camA/camR/camH/camF` (sudut, jarak, tinggi, FOV kamera), `speedK` (profil kecepatan).
 
 ## Cek sebelum unggah ke Adobe Stock
 - Resolusi 3840x2160, MP4/H.264, fps standar, durasi 5-60 detik: cek dengan `ffprobe`.

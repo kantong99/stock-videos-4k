@@ -3,6 +3,11 @@ name: Render videos
 on:
   workflow_dispatch:
     inputs:
+      scene:
+        description: 'Scene yang dirender'
+        type: choice
+        default: car
+        options: [car, all, silk, terrain, aurora, hex, ridges]
       seconds:
         description: 'Durasi detik (5-60)'
         default: '20'
@@ -14,14 +19,36 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: write
+
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      scenes: ${{ steps.p.outputs.scenes }}
+      tag: ${{ steps.p.outputs.tag }}
+    steps:
+      - id: p
+        run: |
+          if [ "${{ inputs.scene }}" = "all" ]; then S='["car","silk","terrain","aurora","hex","ridges"]'; else S='["${{ inputs.scene }}"]'; fi
+          TAG="videos-${{ github.run_number }}"
+          if [ "${{ inputs.preview }}" = "true" ]; then TAG="$TAG-preview"; fi
+          echo "scenes=$S" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+      - name: Buat Release kosong (tempat video diunggah)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ steps.p.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --prerelease --title "Video render #${{ github.run_number }}" --notes "Video hasil render. Unduh file MP4 di bagian Assets."
+
   render:
+    needs: plan
     runs-on: ubuntu-latest
     timeout-minutes: 350
     strategy:
       fail-fast: false
       matrix:
-        scene: [silk, terrain, aurora, hex, ridges]
+        scene: ${{ fromJSON(needs.plan.outputs.scenes) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,21 +59,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: node render.js --scene ${{ matrix.scene }} --seconds ${{ inputs.seconds }} --fps ${{ inputs.fps }} --preview ${{ inputs.preview }}
       - run: ffprobe -hide_banner out/*.mp4
-      - uses: actions/upload-artifact@v4
-        with:
-          name: video-${{ matrix.scene }}
-          path: out/*.mp4
-          retention-days: 7
-          compression-level: 0
-
-  bundle:
-    needs: render
-    runs-on: ubuntu-latest
-    steps:
-      - name: Gabungkan 5 video jadi 1 artifact (1 Zip)
-        uses: actions/upload-artifact/merge@v4
-        with:
-          name: semua-video-4k
-          pattern: video-*
-          delete-merged: true
-          retention-days: 7
+      - name: Unggah ke Release (batas 2 GB per file, tidak memakai kuota artifact)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ needs.plan.outputs.tag }}" out/*.mp4 --clobber --repo "$GITHUB_REPOSITORY"

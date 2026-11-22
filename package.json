@@ -10,6 +10,7 @@
     "render:aurora": "node render.js --scene aurora",
     "render:hex": "node render.js --scene hex",
     "render:ridges": "node render.js --scene ridges",
+    "render:car": "node render.js --scene car",
     "preview": "node render.js --scene silk --preview true"
   },
   "dependencies": {
