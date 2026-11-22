@@ -3,21 +3,13 @@ name: Render videos
 on:
   workflow_dispatch:
     inputs:
-      scene:
-        description: 'Scene yang dirender'
+      mode:
+        description: "preview (cepat, 720p-like) atau final-4k"
         type: choice
-        default: car
-        options: [car, all, silk, terrain, aurora, hex, ridges]
-      seconds:
-        description: 'Durasi detik (5-60)'
-        default: '20'
-      fps:
-        description: 'FPS standar (24, 25, 30, 60)'
-        default: '30'
-      preview:
-        description: 'Preview cepat 1080p (bukan untuk diunggah)'
-        type: boolean
-        default: false
+        options:
+          - preview
+          - final-4k
+        default: preview
 
 permissions:
   contents: write
@@ -26,40 +18,72 @@ jobs:
   plan:
     runs-on: ubuntu-latest
     outputs:
-      scenes: ${{ steps.p.outputs.scenes }}
-      tag: ${{ steps.p.outputs.tag }}
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
-      - id: p
-        run: |
-          if [ "${{ inputs.scene }}" = "all" ]; then S='["car","silk","terrain","aurora","hex","ridges"]'; else S='["${{ inputs.scene }}"]'; fi
-          TAG="videos-${{ github.run_number }}"
-          if [ "${{ inputs.preview }}" = "true" ]; then TAG="$TAG-preview"; fi
-          echo "scenes=$S" >> "$GITHUB_OUTPUT"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-      - name: Buat Release kosong (tempat video diunggah)
+      - name: Tentukan tag dan buat release
+        id: tag
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ steps.p.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --prerelease --title "Video render #${{ github.run_number }}" --notes "Video hasil render. Unduh file MP4 di bagian Assets."
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_NO: ${{ github.run_number }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          TAG="videos-${RUN_NO}"
+          PRE=""
+          if [ "$MODE" = "preview" ]; then
+            TAG="videos-${RUN_NO}-preview"
+            PRE="--prerelease"
+          fi
+          printf '%s\n' "Render otomatis dari run #${RUN_NO} (mode: ${MODE})." > notes.md
+          gh release create "$TAG" --repo "$REPO" $PRE \
+            --title "Video render run #${RUN_NO} (${MODE})" \
+            --notes-file notes.md
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
   render:
     needs: plan
     runs-on: ubuntu-latest
-    timeout-minutes: 350
+    timeout-minutes: 360
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
-        scene: ${{ fromJSON(needs.plan.outputs.scenes) }}
+        scene: [car, silk, terrain, aurora, hex, ridges]
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      TAG: ${{ needs.plan.outputs.tag }}
+      MODE: ${{ inputs.mode }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          node-version: 22
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
-      - run: npm install
-      - run: npx playwright install --with-deps chromium
-      - run: node render.js --scene ${{ matrix.scene }} --seconds ${{ inputs.seconds }} --fps ${{ inputs.fps }} --preview ${{ inputs.preview }}
-      - run: ffprobe -hide_banner out/*.mp4
-      - name: Unggah ke Release (batas 2 GB per file, tidak memakai kuota artifact)
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ needs.plan.outputs.tag }}" out/*.mp4 --clobber --repo "$GITHUB_REPOSITORY"
+          node-version: 20
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Cek scene
+        run: |
+          test -f scenes/${{ matrix.scene }}.js || { echo "scenes/${{ matrix.scene }}.js tidak ada"; exit 1; }
+          ffmpeg -version | head -n 1
+
+      - name: Render ${{ matrix.scene }}
+        run: |
+          if [ "$MODE" = "preview" ]; then
+            node render.js --scene "${{ matrix.scene }}" --seconds 4 --fps 30 --preview true
+          else
+            node render.js --scene "${{ matrix.scene }}" --seconds 20 --fps 30 --size 3840x2160 --preview false
+          fi
+          ls -lh out/
+
+      - name: Upload ke release
+        run: |
+          gh release upload "$TAG" out/*.mp4 --repo "$REPO" --clobber
