@@ -4,12 +4,24 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "preview (cepat, 720p-like) atau final-4k"
+        description: "preview (cepat) atau final-4k"
         type: choice
         options:
           - preview
           - final-4k
         default: preview
+      scene:
+        description: "Scene yang dirender (all = semua scene dalam satu run)"
+        type: choice
+        options:
+          - all
+          - car
+          - silk
+          - terrain
+          - aurora
+          - hex
+          - ridges
+        default: all
 
 permissions:
   contents: write
@@ -19,24 +31,33 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
+      matrix: ${{ steps.tag.outputs.matrix }}
     steps:
-      - name: Tentukan tag dan buat release
+      - name: Tentukan scene, tag, dan buat release
         id: tag
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           RUN_NO: ${{ github.run_number }}
           MODE: ${{ inputs.mode }}
+          SCENE: ${{ inputs.scene }}
         run: |
+          if [ "$SCENE" = "all" ]; then
+            LIST='["car","silk","terrain","aurora","hex","ridges"]'
+          else
+            LIST="[\"$SCENE\"]"
+          fi
+          echo "matrix={\"scene\":$LIST}" >> "$GITHUB_OUTPUT"
+
           TAG="videos-${RUN_NO}"
           PRE=""
           if [ "$MODE" = "preview" ]; then
             TAG="videos-${RUN_NO}-preview"
             PRE="--prerelease"
           fi
-          printf '%s\n' "Render otomatis dari run #${RUN_NO} (mode: ${MODE})." > notes.md
+          printf '%s\n' "Render otomatis dari run #${RUN_NO} (mode: ${MODE}, scene: ${SCENE})." > notes.md
           gh release create "$TAG" --repo "$REPO" $PRE \
-            --title "Video render run #${RUN_NO} (${MODE})" \
+            --title "Video render run #${RUN_NO} (${MODE}, ${SCENE})" \
             --notes-file notes.md
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
@@ -47,8 +68,7 @@ jobs:
     strategy:
       fail-fast: false
       max-parallel: 1
-      matrix:
-        scene: [car, silk, terrain, aurora, hex, ridges]
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       REPO: ${{ github.repository }}
@@ -72,7 +92,7 @@ jobs:
 
       - name: Cek scene
         run: |
-          test -f scenes/${{ matrix.scene }}.js || { echo "scenes/${{ matrix.scene }}.js tidak ada"; exit 1; }
+          test -f "scenes/${{ matrix.scene }}.js" || { echo "scenes/${{ matrix.scene }}.js tidak ada"; exit 1; }
           ffmpeg -version | head -n 1
 
       - name: Render ${{ matrix.scene }}
